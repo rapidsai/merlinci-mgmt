@@ -1,0 +1,62 @@
+---    
+- include_vars: versions.yml
+- name: Add key for NVIDIA CUDA repos
+  apt_key:
+    url: http://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub
+    state: present
+
+- name: Add repo for NVIDIA CUDA drivers
+  apt_repository:
+    repo: "deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64 /"
+
+- name: Install CUDA
+  apt:
+    name:
+      - "cuda-drivers-{{ cuda_drivers_version }}"
+    state: present
+    install_recommends: no
+    update_cache: yes
+
+- name: Update all packages to their latest version
+  apt:
+    name: "*"
+    state: latest
+    update_cache: yes
+
+- name: Hold CUDA Packages
+  dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - "cuda-drivers-{{ cuda_drivers_version }}"
+
+- name: Install nvidia docker apt key
+  apt_key:
+    url: https://nvidia.github.io/nvidia-docker/gpgkey
+
+- name: Add nvidia-docker sources list
+  get_url:
+    url: https://nvidia.github.io/nvidia-docker/ubuntu20.04/nvidia-docker.list
+    dest: /etc/apt/sources.list.d/nvidia-docker.list
+
+- name: Install nvidia-docker2
+  apt:
+    name: nvidia-docker2
+    state: latest
+    update_cache: yes
+
+- name: Add authorized keys
+  authorized_key:
+    user: jenkins
+    key: '{{ item }}'
+  with_file:
+    - ../../common/files/jenkins-prod.id_rsa.pub
+    - ../../common/files/jenkins-ec2.id_rsa.pub
+
+- name: Initialize git-lfs
+  command: git lfs install
+  become: yes
+  become_user: jenkins
+
+- name: Reboot
+  reboot: {}

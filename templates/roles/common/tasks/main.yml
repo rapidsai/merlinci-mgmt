@@ -1,0 +1,143 @@
+---
+- name: Install common packages
+  apt:
+    update_cache: yes
+    pkg:
+      - jq
+      - ansible
+      - openjdk-11-jdk-headless
+      - git
+      - git-lfs
+      - nvme-cli
+      - build-essential
+      - wget
+      - curl
+      - vim
+      - screen
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - software-properties-common
+      - unzip
+      - sudo
+      - chrony
+      - tzdata
+      - acl
+      - tar
+      - gzip
+
+
+- name: Set timezone to PT
+  timezone:
+    name: America/Los_Angeles
+
+- name: Configure Chrony
+  copy:
+    src: chrony.conf
+    dest: /etc/chrony/chrony.conf
+    mode: 0644
+  notify: restart chrony
+
+- name: Initialize git-lfs
+  command: git lfs install
+  vars:
+    ansible_become: no
+
+- name: Upgrade pip
+  pip:
+    executable: pip3
+    extra_args: --upgrade
+    name:
+      - pip
+
+- name: Install pip packages
+  pip:
+    executable: pip3
+    extra_args: --ignore-installed
+    name:
+      - requests
+      - PyYaml
+      - jinja2
+    state: latest
+
+- name: Create docker group
+  group:
+    name: docker
+
+- name: Create ubuntu user
+  user:
+    name: ubuntu
+    uid: 1000
+
+- name: Create jenkins user
+  user:
+    name: jenkins
+    groups:
+      - docker
+    uid: 1001
+    append: yes
+
+- name: Add authorized keys
+  authorized_key:
+    user: ubuntu
+    key: '{{ item }}'
+  with_file:
+    - jenkins-prod.id_rsa.pub
+    - jenkins-ec2.id_rsa.pub
+
+- name: Create ubuntu home directory if not exists
+  file:
+    path: /home/ubuntu
+    state: directory
+
+- name: Download awscli (x86_64)
+  unarchive:
+    src: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+    dest: /home/ubuntu/
+    remote_src: yes
+  when: ansible_architecture == "x86_64"
+
+- name: Download awscli (aarch64)
+  unarchive:
+    src: https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip
+    dest: /home/ubuntu/
+    remote_src: yes
+  when: ansible_architecture == "aarch64"
+
+- name: Install awscli
+  command: /home/ubuntu/aws/install
+
+- name: Add Docker GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Add Docker apt repository (x86_64)
+  apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable"
+  when: ansible_architecture == "x86_64"
+
+- name: Add Docker apt repository (aarch64)
+  apt_repository:
+    repo: "deb [arch=arm64] https://download.docker.com/linux/ubuntu focal stable"
+  when: ansible_architecture == "aarch64"
+
+- name: Install Docker CE
+  apt:
+    update_cache: yes
+    pkg:
+      - docker-ce
+      - docker-ce-cli
+
+- name: Create rc.local
+  copy:
+    dest: /etc/rc.local
+    mode: '0555'
+    content: |
+      #!/bin/bash
+
+- name: Configure python alternative
+  alternatives:
+    name: python
+    link: /usr/bin/python
+    path: /usr/bin/python3.8

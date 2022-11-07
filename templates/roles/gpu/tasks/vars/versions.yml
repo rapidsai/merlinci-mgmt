@@ -1,0 +1,4 @@
+---
+# ./vars/versions.yml
+
+cuda_drivers_version: 515 #515.65.01-1
