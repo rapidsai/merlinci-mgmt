@@ -1,4 +1,10 @@
 # Removes the 'gpuCI-test-this' label from PR's across the organization
+"""
+export GITHUB_AUTH_USER=<username>
+export GITHUB_AUTH_TOKEN=<token>
+
+python ./remove_labels.py
+"""
 
 import requests
 import json
@@ -7,13 +13,14 @@ import os
 import sys
 
 
-REPOS = ['Merlin']
+REPOS = ['Merlin', 'core', 'dataloader', 'models', 'Transformers4Rec', 'systems', 'NVTabular']
 modified_prs = []
 unmodified_prs = []
 
 
 gh_auth_user = os.environ['GITHUB_AUTH_USER']
 gh_auth_token = os.environ['GITHUB_AUTH_TOKEN']
+label_to_remove = os.environ['LABEL_TO_REMOVE'] if 'LABEL_TO_REMOVE' in os.environ else 'gpuCI-test-this'
 
 
 def get_request(url, success_code, auth=None):
@@ -36,8 +43,8 @@ def patch_request(url, body, success_code):
         logging.exception(error)
         sys.exit(1)
 
-def strip_labels(pr, label_to_remove):
-    labels = list(filter(lambda label: label["name"] != label_to_remove, pr['labels']))
+def strip_labels(pr, unwanted_label):
+    labels = list(filter(lambda label: label["name"] != unwanted_label, pr['labels']))
     pr['labels'] = labels
     return pr
 
@@ -52,11 +59,11 @@ def main():
         response = json.dumps(r.json())
         prs = json.loads(response)
 
-        # get prs that have the gpuCI-test-this label
-        prs = list(filter(lambda pr: 'gpuCI-test-this' in list(map(lambda label: label["name"], pr["labels"])), prs))
+        # get prs that have the 'label_to_remove' label
+        prs = list(filter(lambda pr: label_to_remove in list(map(lambda label: label["name"], pr["labels"])), prs))
         
-        # remove 'gpuCI-test-this' label from label list
-        prs = list(map(lambda pr: strip_labels(pr, 'gpuCI-test-this'), prs))
+        # remove 'label_to_remove' label from label list
+        prs = list(map(lambda pr: strip_labels(pr, label_to_remove), prs))
 
         # update the prs in GH
         for pr in prs:
@@ -72,9 +79,9 @@ def main():
             print(url)
     else:
         if len(modified_prs) < 1:
-            print("No PRs were found with the gpuCI-test-this label")
+            print(f"No PRs were found with the {label_to_remove} label")
         else:
-            print(f"Removed labels from the following PRs:")
+            print(f"Removed the '{label_to_remove}' label from the following PRs:")
             for url in modified_prs:
                 print(url)
 
