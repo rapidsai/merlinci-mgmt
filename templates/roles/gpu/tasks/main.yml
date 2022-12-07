@@ -12,15 +12,9 @@
 - name: Install CUDA
   apt:
     name:
-      - "cuda-drivers-{{ cuda_drivers_version }}"
+      - "cuda-drivers-{{ cuda_drivers_version }}={{ exact_cuda_version }}"
     state: present
     install_recommends: no
-    update_cache: yes
-
-- name: Update all packages to their latest version
-  apt:
-    name: "*"
-    state: latest
     update_cache: yes
 
 - name: Hold CUDA Packages
@@ -29,6 +23,12 @@
     selection: hold
   loop:
     - "cuda-drivers-{{ cuda_drivers_version }}"
+
+- name: Update all packages to their latest version
+  apt:
+    name: "*"
+    state: latest
+    update_cache: yes
 
 - name: Install nvidia docker apt key
   apt_key:
